@@ -1619,6 +1619,30 @@ class TestCsvNormalization:
 		# Real newlines present → no unescaping, literal \n stays in the field
 		assert csv_file.content == 'path,desc\n/tmp/a\\nb,test file'
 
+	def test_normalize_does_not_split_single_row_containing_windows_path(self):
+		"""A single-row CSV whose field legitimately contains literal \\n text
+		(e.g. a Windows path like C:\\new_folder) must not be rewritten into
+		multiple rows by the double-escape repair."""
+		csv_file = CsvFile(name='test')
+		csv_file.write_file_content('C:\\new_folder,D:\\backup')
+		# The literal \n is part of the path, not an escaped row break
+		assert csv_file.content == 'C:\\new_folder,D:\\backup'
+		assert csv_file.get_line_count == 1
+
+	def test_normalize_does_not_split_single_row_regex_snippet(self):
+		"""Literal \\n inside a regex/documentation field in a single-row CSV survives."""
+		csv_file = CsvFile(name='test')
+		csv_file.write_file_content('pattern,replace \\n with a semicolon')
+		assert csv_file.content == 'pattern,replace \\n with a semicolon'
+		assert csv_file.get_line_count == 1
+
+	def test_append_does_not_split_appended_row_with_literal_newline_text(self):
+		"""Appending a single row that contains literal \\n text keeps it one row."""
+		csv_file = CsvFile(name='test')
+		csv_file.write_file_content('src,dst')
+		csv_file.append_file_content('C:\\new_folder,D:\\backup')
+		assert csv_file.content == 'src,dst\nC:\\new_folder,D:\\backup'
+
 	def test_normalize_preserves_leading_trailing_spaces_in_fields(self):
 		"""Leading/trailing spaces in field values must not be stripped."""
 		csv_file = CsvFile(name='test')

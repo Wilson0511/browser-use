@@ -232,11 +232,17 @@ class CsvFile(BaseFile):
 			return raw
 
 		# Detect double-escaped LLM tool call output: if the content has no real
-		# newlines but contains literal \n sequences, the entire string is likely
-		# double-escaped JSON. Unescape \" → " first, then \n → newline.
+		# newlines but contains literal \n sequences, the string may be double-escaped
+		# JSON. Only apply the repair when the unescaped text parses as a rectangular
+		# multi-row CSV (>= 2 rows, equal field counts): literal \n in otherwise
+		# legitimate single-row text — Windows paths like C:\new_folder, regex
+		# snippets — is intentional content and must survive verbatim.
 		if '\n' not in stripped and '\\n' in stripped:
-			stripped = stripped.replace('\\"', '"')
-			stripped = stripped.replace('\\n', '\n')
+			candidate = stripped.replace('\\"', '"').replace('\\n', '\n')
+			candidate_rows = [row for row in csv.reader(io.StringIO(candidate)) if row]
+			field_counts = {len(row) for row in candidate_rows}
+			if len(candidate_rows) >= 2 and len(field_counts) == 1:
+				stripped = candidate
 
 		reader = csv.reader(io.StringIO(stripped))
 		rows: list[list[str]] = []
